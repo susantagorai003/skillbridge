@@ -111,11 +111,14 @@ class InMemoryCollection:
             modified_count = mod
         return UpdateResult()
 
-    def count_documents(self, filter=None):
+    def count_documents(self, filter=None, *args, **kwargs):
         filter = filter or {}
+        limit = kwargs.get('limit')
         if not filter:
-            return len(self._docs)
-        return len([d for d in self._docs if self._matches(d, filter)])
+            count = len(self._docs)
+        else:
+            count = len([d for d in self._docs if self._matches(d, filter)])
+        return min(count, limit) if limit else count
 
     def aggregate(self, pipeline):
         return []
@@ -148,8 +151,8 @@ def get_client():
     try:
         _client = MongoClient(
             uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
+            serverSelectionTimeoutMS=10000,
+            connectTimeoutMS=10000,
             maxPoolSize=50,
             minPoolSize=1,
             tlsAllowInvalidCertificates=True,
