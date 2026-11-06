@@ -344,10 +344,12 @@ export default function TPODashboard() {
 
                   <div className="flex gap-2">
                     <Button
+                      variant="primary"
                       size="sm"
                       onClick={() => handleOpenEligibilityEngine(drive)}
                       icon={Filter}
-                      className="flex-1 bg-midnight hover:bg-midnight-light text-teal font-bold text-xs"
+                      style={{ backgroundColor: '#00BFA6', color: '#0F172A' }}
+                      className="flex-1 font-bold text-xs hover:opacity-90 shadow-sm text-slate-900"
                     >
                       Evaluate Eligibility
                     </Button>

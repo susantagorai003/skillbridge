@@ -16,7 +16,7 @@ const sizes = {
 }
 
 const variantStyles = {
-  primary: { backgroundColor: '#00BFA6', color: '#14213D' },
+  primary: { backgroundColor: '#00BFA6', color: '#0F172A' },
   secondary: { backgroundColor: '#14213D', color: '#FFFFFF' },
   coral: { backgroundColor: '#FF6B5E', color: '#FFFFFF' },
   outline: { backgroundColor: '#FFFFFF', color: '#334155', borderColor: '#CBD5E1' },
