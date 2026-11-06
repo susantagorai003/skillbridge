@@ -61,11 +61,14 @@ class BaseRepository:
         return [self._serialize_doc(doc) for doc in docs]
 
     def find_by_id(self, id_value):
-        """Find a document by its ID."""
-        oid = self._to_object_id(id_value)
-        if oid is None:
+        """Find a document by its ID (supports ObjectId, string ID, and custom string IDs)."""
+        if not id_value:
             return None
-        doc = self.collection.find_one({'_id': oid})
+        oid = self._to_object_id(id_value)
+        if oid is not None:
+            doc = self.collection.find_one({'$or': [{'_id': oid}, {'id': str(id_value)}]})
+        else:
+            doc = self.collection.find_one({'id': str(id_value)})
         return self._serialize_doc(doc)
 
     def find_one(self, filter_dict):
