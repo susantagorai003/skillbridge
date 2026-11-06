@@ -155,17 +155,22 @@ class TPOVerifyStudentView(APIView):
         is_verified = bool(request.data.get('is_verified', True))
         status_note = request.data.get('status_note', 'Placement credentials verified by TPO.')
 
+        from bson import ObjectId
+        oid = ObjectId(student_id) if ObjectId.is_valid(student_id) else None
+
         users_col = get_collection('users')
-        users_col.update_one({'id': str(student_id)}, {'$set': {'is_verified': is_verified}})
+        user_query = {'$or': [{'_id': oid}, {'id': str(student_id)}]} if oid else {'id': str(student_id)}
+        users_col.update_one(user_query, {'$set': {'is_verified': is_verified}})
         
         profiles_col = get_collection('student_profiles')
+        profile_query = {'$or': [{'user_id': str(student_id)}, {'user_id': oid}]} if oid else {'user_id': str(student_id)}
         profiles_col.update_one(
-            {'user_id': str(student_id)},
+            profile_query,
             {'$set': {'is_verified': is_verified, 'verification_note': status_note}}
         )
 
         NotificationService.send_notification(
-            recipient_id=student_id,
+            recipient_id=str(student_id),
             title='Profile Verification Status',
             message=f"Your placement profile has been {'verified and approved' if is_verified else 'rejected'} by the TPO Office. {status_note}",
             notification_type='profile_verification',
@@ -177,7 +182,7 @@ class TPOVerifyStudentView(APIView):
             actor_role='tpo',
             actor_name='TPO Office',
             resource_type='student',
-            resource_id=student_id,
+            resource_id=str(student_id),
             details=f"Verification set to {is_verified} for student {student_id}."
         )
 

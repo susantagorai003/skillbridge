@@ -60,10 +60,13 @@ class MessagingService:
             return {'success': False, 'error': 'No recipient email provided'}
 
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@skillbridge.com')
+        # Ensure subject and message are console-safe for Windows local environments
+        clean_subject = str(subject).replace('₹', 'INR ')
+        clean_message = str(message).replace('₹', 'INR ')
         try:
             send_mail(
-                subject=subject,
-                message=message,
+                subject=clean_subject,
+                message=clean_message,
                 from_email=from_email,
                 recipient_list=[to_email],
                 html_message=html_message,
@@ -117,22 +120,14 @@ class MessagingService:
         twilio_content_sid = os.getenv('TWILIO_CONTENT_SID')
 
         if twilio_sid and twilio_token and twilio_wa_number:
-            # Direct REST HTTP request to Twilio Messages API
             from_wa = twilio_wa_number.strip().replace('whatsapp:', '')
+            
+            # 1. Attempt sending customized Body message (works seamlessly when 24h conversation session is active)
             tw_data = {
                 'From': f"whatsapp:{from_wa}",
                 'To': f"whatsapp:{clean_phone}",
+                'Body': message
             }
-
-            if twilio_content_sid:
-                tw_data['ContentSid'] = twilio_content_sid
-                vars_dict = (metadata or {}).get('content_variables') or {
-                    "1": str((metadata or {}).get('company', 'Campus Placement')),
-                    "2": str((metadata or {}).get('package', 'SkillBridge Portal'))
-                }
-                tw_data['ContentVariables'] = json.dumps(vars_dict)
-            else:
-                tw_data['Body'] = message
 
             status_code, body = _http_post(
                 f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
@@ -140,6 +135,26 @@ class MessagingService:
                 data=tw_data,
                 timeout=12
             )
+
+            # 2. If Twilio requires a pre-approved template (error 21654 when outside 24h user-initiated window), fallback to ContentSid
+            if status_code not in (200, 201) and twilio_content_sid and ('21654' in body or 'ContentSid Required' in body):
+                logger.info(f"[Twilio WhatsApp] Freeform window closed, retrying with ContentSid template {twilio_content_sid}...")
+                vars_dict = (metadata or {}).get('content_variables') or {
+                    "1": str((metadata or {}).get('company', 'Campus Placement')),
+                    "2": str((metadata or {}).get('package', 'SkillBridge Portal'))
+                }
+                tw_data_template = {
+                    'From': f"whatsapp:{from_wa}",
+                    'To': f"whatsapp:{clean_phone}",
+                    'ContentSid': twilio_content_sid,
+                    'ContentVariables': json.dumps(vars_dict)
+                }
+                status_code, body = _http_post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
+                    auth=(twilio_sid, twilio_token),
+                    data=tw_data_template,
+                    timeout=12
+                )
 
             try:
                 tw_json = json.loads(body)
@@ -276,6 +291,7 @@ class MessagingService:
         branches = ", ".join(drive_doc.get('eligible_branches', ['All Branches']))
         deadline = drive_doc.get('deadline', 'TBD')
         drive_date = drive_doc.get('drive_date', 'TBD')
+        frontend_base = os.getenv('FRONTEND_URL', 'https://skillbridge-gold-one.vercel.app').rstrip('/')
 
         subject = f"🎯 [SkillBridge Placement Alert] {company_name} is hiring for {role_title} (₹{ctc} LPA)"
         plain_email = (
@@ -289,7 +305,7 @@ class MessagingService:
             f"• Drive Date: {drive_date}\n"
             f"• Application Deadline: {deadline}\n\n"
             f"Please visit the SkillBridge portal to verify your eligibility and apply before the deadline:\n"
-            f"http://localhost:5173/student/opportunities\n\n"
+            f"{frontend_base}/student/opportunities\n\n"
             f"Best regards,\n"
             f"Training & Placement Office (TPO)\n"
             f"SkillBridge Portal"
@@ -333,7 +349,7 @@ class MessagingService:
                     </tr>
                 </table>
                 <div style="text-align: center; margin-top: 25px;">
-                    <a href="http://localhost:5173/student/opportunities" style="background-color: #00BFA6; color: #14213D; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block; font-size: 14px;">
+                    <a href="{frontend_base}/student/opportunities" style="background-color: #00BFA6; color: #14213D; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px; display: inline-block; font-size: 14px;">
                         Check Eligibility & Apply Now
                     </a>
                 </div>
@@ -353,7 +369,7 @@ class MessagingService:
             f"📚 *Eligible Branches:* {branches}\n"
             f"📅 *Drive Date:* {drive_date}\n"
             f"⏳ *Deadline:* {deadline}\n\n"
-            f"👉 Apply now on SkillBridge: http://localhost:5173/student/opportunities"
+            f"👉 Apply now on SkillBridge: {frontend_base}/student/opportunities"
         )
 
         # 1. In-App Notification Broadcast
@@ -370,14 +386,15 @@ class MessagingService:
             users_col = get_collection('users')
             profiles_col = get_collection('student_profiles')
 
-            students = list(users_col.find({'role': 'student', 'is_active': True}, {'_id': 0, 'id': 1, 'email': 1, 'name': 1, 'phone': 1}))
-            profiles_map = {p.get('user_id'): p for p in profiles_col.find({}, {'_id': 0, 'user_id': 1, 'phone': 1})}
+            students = list(users_col.find({'role': 'student', 'is_active': True}))
+            profiles = list(profiles_col.find({}))
+            profiles_map = {str(p.get('user_id')): p for p in profiles}
 
             dispatched_emails = 0
             dispatched_wa = 0
 
             for st in students:
-                student_id = st.get('id')
+                student_id = str(st.get('id') or st.get('_id'))
                 student_email = st.get('email')
                 student_phone = st.get('phone') or profiles_map.get(student_id, {}).get('phone')
 
@@ -388,7 +405,7 @@ class MessagingService:
 
                 # Send WhatsApp
                 if student_phone:
-                    if cls.send_whatsapp_notification(student_phone, wa_message, metadata={'drive_id': drive_doc.get('id')}):
+                    if cls.send_whatsapp_notification(student_phone, wa_message, metadata={'drive_id': drive_doc.get('id'), 'company': company_name, 'package': f"₹{ctc} LPA"}):
                         dispatched_wa += 1
 
             AuditService.log_event(

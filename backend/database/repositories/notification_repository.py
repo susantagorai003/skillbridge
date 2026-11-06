@@ -6,8 +6,21 @@ class NotificationRepository(BaseRepository):
     def __init__(self):
         super().__init__('notifications')
 
+    def _build_user_filter(self, user_id):
+        from bson import ObjectId
+        uid_str = str(user_id)
+        valid_ids = [uid_str]
+        if ObjectId.is_valid(uid_str):
+            valid_ids.append(ObjectId(uid_str))
+        return {
+            '$or': [
+                {'user_id': {'$in': valid_ids}},
+                {'recipient_id': {'$in': valid_ids}}
+            ]
+        }
+
     def find_by_user(self, user_id, unread_only=False, page=1, page_size=20):
-        filter_dict = {'user_id': str(user_id)}
+        filter_dict = self._build_user_filter(user_id)
         if unread_only:
             filter_dict['is_read'] = False
         return self.paginate(filter_dict, page=page, page_size=page_size, sort=[('created_at', -1)])
@@ -16,13 +29,14 @@ class NotificationRepository(BaseRepository):
         return self.update_one(notification_id, {'is_read': True})
 
     def mark_all_read(self, user_id):
-        return self.update_many(
-            {'user_id': str(user_id), 'is_read': False},
-            {'is_read': True}
-        )
+        base_filter = self._build_user_filter(user_id)
+        base_filter['is_read'] = False
+        return self.update_many(base_filter, {'is_read': True})
 
     def unread_count(self, user_id):
-        return self.count({'user_id': str(user_id), 'is_read': False})
+        base_filter = self._build_user_filter(user_id)
+        base_filter['is_read'] = False
+        return self.count(base_filter)
 
     def create_notification(self, user_id, type, title, message, data=None):
         return self.insert_one({

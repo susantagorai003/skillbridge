@@ -36,10 +36,10 @@ class NotificationService:
         """Broadcast notification to all active users with a specific role (e.g. all students)."""
         try:
             users_col = get_collection('users')
-            recipients = list(users_col.find({'role': target_role, 'is_active': True}, {'_id': 0, 'id': 1}))
+            recipients = list(users_col.find({'role': target_role, 'is_active': True}))
             created = []
             for u in recipients:
-                uid = u.get('id')
+                uid = str(u.get('id') or u.get('_id'))
                 if uid:
                     res = NotificationService.send_notification(uid, title, message, notification_type, link)
                     if res:
@@ -53,10 +53,10 @@ class NotificationService:
         """Broadcast notification to all students in a specific department."""
         try:
             profiles_col = get_collection('student_profiles')
-            students = list(profiles_col.find({'department': department_name}, {'_id': 0, 'user_id': 1}))
+            students = list(profiles_col.find({'department': department_name}))
             created = []
             for s in students:
-                uid = s.get('user_id')
+                uid = str(s.get('user_id') or s.get('id') or s.get('_id'))
                 if uid:
                     res = NotificationService.send_notification(uid, title, message, notification_type, link)
                     if res:
