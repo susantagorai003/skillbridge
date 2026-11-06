@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: skillbridge-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: gunicorn config.wsgi:application
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MONGODB_NAME
+        value: skillbridge
+      - key: MONGODB_URI
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false

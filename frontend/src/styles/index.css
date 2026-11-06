@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+:root {
+  /* Primary Vibrant Brand Palette */
+  --color-midnight: #14213D;
+  --color-midnight-dark: #0A111F;
+  --color-midnight-light: #1E2E4F;
+  --color-midnight-glass: rgba(20, 33, 61, 0.85);
+  
+  --color-teal: #00BFA6;
+  --color-teal-dark: #009B86;
+  --color-teal-light: #33CCB8;
+  --color-teal-glow: rgba(0, 191, 166, 0.25);
+  
+  --color-coral: #FF6B5E;
+  --color-coral-dark: #E65345;
+  --color-coral-light: #FF897D;
+  --color-coral-glow: rgba(255, 107, 94, 0.25);
+  
+  --color-offwhite: #F8F9F6;
+  --color-offwhite-card: #FFFFFF;
+  --color-offwhite-border: #E2E8F0;
+  
+  --color-mint: #D9F5EA;
+  --color-mint-light: #EDFAF4;
+  --color-mint-dark: #058564;
+  
+  --color-charcoal: #202B36;
+  --color-charcoal-light: #3B4B5B;
+  --color-charcoal-muted: #64748B;
+  
+  --color-golden: #FFC857;
+  --color-golden-dark: #E5A833;
+  --color-golden-light: #FFD87D;
+
+  --font-heading: 'Manrope', 'Inter', -apple-system, sans-serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+}
+
+@theme {
+  --color-midnight: #14213D;
+  --color-midnight-dark: #0A111F;
+  --color-midnight-light: #1E2E4F;
+  
+  --color-teal: #00BFA6;
+  --color-teal-dark: #009B86;
+  --color-teal-light: #33CCB8;
+  
+  --color-coral: #FF6B5E;
+  --color-coral-dark: #E65345;
+  --color-coral-light: #FF897D;
+  
+  --color-offwhite: #F8F9F6;
+  --color-mint: #D9F5EA;
+  --color-charcoal: #202B36;
+  --color-golden: #FFC857;
+
+  /* Legacy color aliases for compatibility */
+  --color-terracotta: #FF6B5E;
+  --color-terracotta-dark: #E65345;
+  --color-terracotta-light: #FF897D;
+  --color-forest: #00BFA6;
+  --color-forest-dark: #009B86;
+  --color-olive: #14213D;
+  --color-warm-border: #E2E8F0;
+  --color-ivory: #F8F9F6;
+
+  --font-heading: 'Manrope', 'Inter', -apple-system, sans-serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: #202B36;
+  background-color: #F8F9F6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Manrope', 'Inter', -apple-system, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Bulletproof Centering & Container Widths */
+.mx-auto {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.max-w-7xl { max-width: 80rem !important; }
+.max-w-6xl { max-width: 72rem !important; }
+.max-w-5xl { max-width: 64rem !important; }
+.max-w-4xl { max-width: 56rem !important; }
+.max-w-3xl { max-width: 48rem !important; }
+.max-w-2xl { max-width: 42rem !important; }
+.max-w-xl { max-width: 36rem !important; }
+.max-w-lg { max-width: 32rem !important; }
+.max-w-md { max-width: 28rem !important; }
+
+/* Explicit Bulletproof Utility Fallbacks */
+.bg-midnight { background-color: #14213D !important; }
+.bg-midnight-light { background-color: #1E2E4F !important; }
+.bg-midnight-dark { background-color: #0A111F !important; }
+.bg-teal { background-color: #00BFA6 !important; }
+.bg-teal-dark { background-color: #009B86 !important; }
+.bg-teal-light { background-color: #33CCB8 !important; }
+.bg-coral { background-color: #FF6B5E !important; }
+.bg-coral-dark { background-color: #E65345 !important; }
+.bg-offwhite { background-color: #F8F9F6 !important; }
+.bg-mint { background-color: #D9F5EA !important; }
+.bg-charcoal { background-color: #202B36 !important; }
+.bg-golden { background-color: #FFC857 !important; }
+
+.text-midnight { color: #14213D !important; }
+.text-teal { color: #00BFA6 !important; }
+.text-teal-dark { color: #009B86 !important; }
+.text-coral { color: #FF6B5E !important; }
+.text-coral-dark { color: #E65345 !important; }
+.text-golden { color: #FFC857 !important; }
+.text-golden-dark { color: #E5A833 !important; }
+.text-charcoal { color: #202B36 !important; }
+.text-offwhite { color: #F8F9F6 !important; }
+.text-white { color: #FFFFFF !important; }
+.text-black { color: #000000 !important; }
+
+.border-teal { border-color: #00BFA6 !important; }
+.border-coral { border-color: #FF6B5E !important; }
+.border-midnight { border-color: #14213D !important; }
+.border-slate-200 { border-color: #E2E8F0 !important; }
+.border-slate-300 { border-color: #CBD5E1 !important; }
+.border-slate-700 { border-color: #334155 !important; }
+.border-slate-800 { border-color: #1E293B !important; }
+
+/* Vibrant SaaS Shadows & Glow Effects */
+.shadow-card {
+  box-shadow: 0 4px 20px -2px rgba(20, 33, 61, 0.08), 0 2px 6px -1px rgba(20, 33, 61, 0.05) !important;
+}
+
+.shadow-card-hover {
+  box-shadow: 0 16px 36px -4px rgba(20, 33, 61, 0.15), 0 6px 14px -2px rgba(20, 33, 61, 0.08) !important;
+}
+
+.glow-teal {
+  box-shadow: 0 0 25px -4px rgba(0, 191, 166, 0.4);
+}
+
+.glow-coral {
+  box-shadow: 0 0 25px -4px rgba(255, 107, 94, 0.4);
+}
+
+.glow-golden {
+  box-shadow: 0 0 25px -4px rgba(255, 200, 87, 0.4);
+}
+
+/* Vibrant Text Gradients */
+.text-gradient-teal {
+  background: linear-gradient(135deg, #00BFA6 0%, #33CCB8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-coral {
+  background: linear-gradient(135deg, #FF6B5E 0%, #FFC857 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-hero {
+  background: linear-gradient(135deg, #FFFFFF 30%, #D9F5EA 70%, #00BFA6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
