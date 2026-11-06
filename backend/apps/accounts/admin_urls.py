@@ -5,6 +5,7 @@ from apps.accounts.admin_views import (
     AdminDepartmentView,
     AdminAuditLogsView,
     AdminAnnouncementView,
+    AdminTestMessagingView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     path('departments/', AdminDepartmentView.as_view(), name='admin-departments'),
     path('logs/', AdminAuditLogsView.as_view(), name='admin-logs'),
     path('announcements/', AdminAnnouncementView.as_view(), name='admin-announcements'),
+    path('test-messaging/', AdminTestMessagingView.as_view(), name='admin-test-messaging'),
 ]

@@ -12,3 +12,5 @@ PyMuPDF==1.25.1
 drf-yasg==1.21.8
 gunicorn==23.0.0
 whitenoise==6.8.2
+requests>=2.31.0
+twilio>=8.0.0

@@ -13,6 +13,7 @@ from rest_framework.permissions import AllowAny
 from database.connection import get_collection
 from services.notification_service import NotificationService
 from services.audit_service import AuditService
+from services.messaging_service import MessagingService
 
 
 class AdminUserManagementView(APIView):
@@ -224,3 +225,21 @@ class AdminAnnouncementView(APIView):
         )
 
         return Response({'success': True, 'announcement': ann_doc, 'message': 'Platform announcement broadcasted successfully!'}, status=status.HTTP_201_CREATED)
+
+
+class AdminTestMessagingView(APIView):
+    """
+    Test and verify Email and WhatsApp delivery in production.
+    Accepts target_email and target_phone.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        target_email = request.data.get('email')
+        target_phone = request.data.get('phone')
+
+        if not target_email and not target_phone:
+            return Response({'success': False, 'message': 'Provide at least email or phone number to test.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = MessagingService.test_delivery(target_email=target_email, target_phone=target_phone)
+        return Response({'success': True, 'results': results, 'message': 'Test notification processed.'})

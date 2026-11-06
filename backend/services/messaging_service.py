@@ -8,6 +8,11 @@ Handles Multi-Channel Notifications:
 import os
 import logging
 import uuid
+import json
+import base64
+import urllib.request
+import urllib.parse
+import urllib.error
 from datetime import datetime, timezone
 from django.core.mail import send_mail
 from django.conf import settings
@@ -18,15 +23,41 @@ from services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 
+def _http_post(url, data=None, json_payload=None, headers=None, auth=None, timeout=10):
+    """Zero-dependency HTTP POST helper using Python's standard library urllib."""
+    headers = headers or {}
+    if auth:
+        user, pwd = auth
+        creds = base64.b64encode(f"{user}:{pwd}".encode('utf-8')).decode('ascii')
+        headers['Authorization'] = f"Basic {creds}"
+
+    encoded_data = None
+    if json_payload is not None:
+        headers['Content-Type'] = 'application/json'
+        encoded_data = json.dumps(json_payload).encode('utf-8')
+    elif data is not None:
+        headers['Content-Type'] = 'application/x-www-form-urlencoded'
+        encoded_data = urllib.parse.urlencode(data).encode('utf-8')
+
+    req = urllib.request.Request(url, data=encoded_data, headers=headers, method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status, response.read().decode('utf-8')
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode('utf-8')
+    except Exception as e:
+        return 500, str(e)
+
+
 class MessagingService:
     @staticmethod
     def send_email_notification(to_email, subject, message, html_message=None):
         """
         Dispatch an email to a recipient.
-        Falls back safely without breaking caller execution.
+        Uses live SMTP if credentials provided, or console backend if in local dev.
         """
         if not to_email:
-            return False
+            return {'success': False, 'error': 'No recipient email provided'}
 
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@skillbridge.com')
         try:
@@ -36,23 +67,26 @@ class MessagingService:
                 from_email=from_email,
                 recipient_list=[to_email],
                 html_message=html_message,
-                fail_silently=True
+                fail_silently=False
             )
-            logger.info(f"[Email Dispatched] To: {to_email} | Subject: {subject}")
-            return True
+            backend_name = getattr(settings, 'EMAIL_BACKEND', 'console')
+            logger.info(f"[Email Dispatched via {backend_name}] To: {to_email} | Subject: {subject}")
+            return {'success': True, 'email': to_email, 'backend': backend_name}
         except Exception as e:
             logger.warning(f"[Email Warning] Could not send email to {to_email}: {e}")
-            return False
+            return {'success': False, 'email': to_email, 'error': str(e)}
 
     @staticmethod
     def send_whatsapp_notification(phone, message, metadata=None):
         """
         Dispatch a WhatsApp message to a student/user's phone number.
-        - If TWILIO credentials are set in environment variables, dispatches real Twilio WhatsApp API.
-        - Always logs dispatch record into MongoDB 'whatsapp_dispatch_logs' collection for tracking and audit.
+        Supported providers:
+        1. Twilio WhatsApp API (via Twilio SDK or direct REST HTTP)
+        2. Meta WhatsApp Cloud API (Graph API)
+        3. SkillBridge Internal SMS/WhatsApp Gateway (logged to MongoDB 'whatsapp_dispatch_logs')
         """
         if not phone:
-            return False
+            return {'success': False, 'error': 'No phone number provided'}
 
         clean_phone = phone.strip().replace(' ', '').replace('-', '')
         if not clean_phone.startswith('+') and len(clean_phone) == 10:
@@ -68,29 +102,75 @@ class MessagingService:
             'created_at': datetime.now(timezone.utc).isoformat()
         }
 
-        # Check for Twilio WhatsApp Credentials
+        # 1. Check for Twilio Credentials
         twilio_sid = os.getenv('TWILIO_ACCOUNT_SID')
         twilio_token = os.getenv('TWILIO_AUTH_TOKEN')
         twilio_wa_number = os.getenv('TWILIO_WHATSAPP_NUMBER')
 
+        # 2. Check for Meta WhatsApp Cloud API Credentials
+        meta_token = os.getenv('META_WHATSAPP_TOKEN')
+        meta_phone_id = os.getenv('META_WHATSAPP_PHONE_ID')
+
+        provider_used = 'skillbridge_sms_gateway'
+        error_msg = None
+
         if twilio_sid and twilio_token and twilio_wa_number:
+            # Direct REST HTTP request to Twilio Messages API
+            from_wa = twilio_wa_number.strip().replace('whatsapp:', '')
+            status_code, body = _http_post(
+                f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
+                auth=(twilio_sid, twilio_token),
+                data={
+                    'From': f"whatsapp:{from_wa}",
+                    'To': f"whatsapp:{clean_phone}",
+                    'Body': message
+                },
+                timeout=12
+            )
+
             try:
-                from twilio.rest import Client
-                client = Client(twilio_sid, twilio_token)
-                client.messages.create(
-                    body=message,
-                    from_=f"whatsapp:{twilio_wa_number}",
-                    to=f"whatsapp:{clean_phone}"
-                )
-                dispatch_record['provider'] = 'twilio'
-                logger.info(f"[WhatsApp Real Dispatch] Message sent to {clean_phone}")
-            except Exception as e:
-                dispatch_record['provider'] = 'twilio_error'
-                dispatch_record['error'] = str(e)
-                logger.warning(f"[WhatsApp Warning] Twilio API error: {e}")
-        else:
-            dispatch_record['provider'] = 'skillbridge_sms_gateway'
-            logger.info(f"[WhatsApp Gateway] Queued & dispatched notification to {clean_phone}")
+                tw_json = json.loads(body)
+            except Exception:
+                tw_json = {}
+
+            if status_code in (200, 201):
+                provider_used = 'twilio'
+                dispatch_record['twilio_sid'] = tw_json.get('sid')
+                dispatch_record['twilio_status'] = tw_json.get('status', 'queued')
+                logger.info(f"[Twilio WhatsApp SUCCESS] Delivered to {clean_phone} | SID: {tw_json.get('sid')}")
+            else:
+                provider_used = 'twilio_error'
+                err_text = tw_json.get('message') or body
+                err_code = tw_json.get('code', status_code)
+                error_msg = f"Twilio Error {err_code}: {err_text}"
+                logger.warning(f"[Twilio Warning] {error_msg}")
+
+        elif meta_token and meta_phone_id:
+            # Direct Meta WhatsApp Cloud API request
+            payload = {
+                'messaging_product': 'whatsapp',
+                'to': clean_phone.replace('+', ''),
+                'type': 'text',
+                'text': {'body': message}
+            }
+            status_code, body = _http_post(
+                f"https://graph.facebook.com/v18.0/{meta_phone_id}/messages",
+                headers={'Authorization': f"Bearer {meta_token}"},
+                json_payload=payload,
+                timeout=10
+            )
+            if status_code in (200, 201):
+                provider_used = 'meta_cloud'
+                logger.info(f"[Meta WhatsApp] Delivered to {clean_phone}")
+            else:
+                provider_used = 'meta_error'
+                error_msg = f"Meta API status {status_code}: {body}"
+                logger.warning(f"[Meta Warning] {error_msg}")
+
+        dispatch_record['provider'] = provider_used
+        if error_msg:
+            dispatch_record['error'] = error_msg
+            dispatch_record['status'] = 'failed'
 
         try:
             col = get_collection('whatsapp_dispatch_logs')
@@ -99,7 +179,77 @@ class MessagingService:
         except Exception as e:
             logger.error(f"[DB Error] Could not save WhatsApp log: {e}")
 
-        return True
+        return {
+            'success': dispatch_record['status'] == 'dispatched',
+            'phone': clean_phone,
+            'provider': provider_used,
+            'error': error_msg
+        }
+
+    @staticmethod
+    def send_sms_notification(phone, message):
+        """
+        Dispatch a direct cellular SMS using Twilio Programmable SMS API.
+        """
+        if not phone:
+            return {'success': False, 'error': 'No phone number provided'}
+
+        clean_phone = phone.strip().replace(' ', '').replace('-', '')
+        if not clean_phone.startswith('+') and len(clean_phone) == 10:
+            clean_phone = f"+91{clean_phone}"
+
+        twilio_sid = os.getenv('TWILIO_ACCOUNT_SID')
+        twilio_token = os.getenv('TWILIO_AUTH_TOKEN')
+        twilio_sms_number = os.getenv('TWILIO_PHONE_NUMBER') or os.getenv('TWILIO_SMS_NUMBER')
+
+        if not (twilio_sid and twilio_token and twilio_sms_number):
+            return {'success': False, 'provider': 'unconfigured', 'message': 'Twilio SMS credentials not set.'}
+
+        status_code, body = _http_post(
+            f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
+            auth=(twilio_sid, twilio_token),
+            data={
+                'From': twilio_sms_number,
+                'To': clean_phone,
+                'Body': message
+            },
+            timeout=12
+        )
+        return {'success': status_code in (200, 201), 'status_code': status_code, 'body': body}
+
+    @classmethod
+    def test_delivery(cls, target_email=None, target_phone=None):
+        """
+        Diagnostic delivery test utility.
+        Dispatches test notification to target email and target WhatsApp number.
+        """
+        results = {'email': None, 'whatsapp': None}
+
+        if target_email:
+            subject = "🧪 [SkillBridge Test] Email Notification Delivery Test"
+            message = (
+                "Hello from SkillBridge!\n\n"
+                "This is a confirmation that your email notification service is properly configured and delivering messages successfully in production.\n\n"
+                "SkillBridge Core Services"
+            )
+            html = """
+            <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #00BFA6; border-radius: 8px;">
+                <h2 style="color: #14213D; margin-top: 0;">SkillBridge Email Delivery Test</h2>
+                <p style="color: #059669; font-weight: bold;">✓ Live SMTP Connection Active</p>
+                <p style="color: #475569; font-size: 13px;">This verifies that your placement notifications will reach students immediately upon drive announcements.</p>
+            </div>
+            """
+            results['email'] = cls.send_email_notification(target_email, subject, message, html_message=html)
+
+        if target_phone:
+            wa_text = (
+                "🧪 *[SkillBridge Test]*\n"
+                "Your WhatsApp alert service is active and connected!\n"
+                "You will receive instant campus placement drive notifications and interview schedules."
+            )
+            results['whatsapp'] = cls.send_whatsapp_notification(target_phone, wa_text, metadata={'test': True})
+
+        return results
 
     @classmethod
     def broadcast_placement_drive(cls, drive_doc):
