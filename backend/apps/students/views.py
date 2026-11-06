@@ -48,7 +48,8 @@ class StudentProfileView(APIView):
         data = serializer.validated_data
         existing = repo.find_by_user_id(request.user.id)
         if existing:
-            updated = repo.update_one(existing['id'], data)
+            doc_id = existing.get('id') or existing.get('_id')
+            updated = repo.update_one(doc_id, data) or existing
         else:
             data['user_id'] = str(request.user.id)
             updated = repo.insert_one(data)

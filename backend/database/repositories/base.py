@@ -116,17 +116,21 @@ class BaseRepository:
 
     def update_one(self, id_value, update_dict):
         """Update a document by ID."""
-        oid = self._to_object_id(id_value)
-        if oid is None:
+        if not id_value:
             return None
+        oid = self._to_object_id(id_value)
         update_dict['updated_at'] = datetime.now(timezone.utc)
-        result = self.collection.update_one(
-            {'_id': oid},
-            {'$set': update_dict}
-        )
-        if result.modified_count > 0:
-            return self.find_by_id(id_value)
-        return None
+        if oid is not None:
+            result = self.collection.update_one(
+                {'$or': [{'_id': oid}, {'id': str(id_value)}]},
+                {'$set': update_dict}
+            )
+        else:
+            result = self.collection.update_one(
+                {'id': str(id_value)},
+                {'$set': update_dict}
+            )
+        return self.find_by_id(id_value)
 
     def update_many(self, filter_dict, update_dict):
         """Update multiple documents matching the filter."""

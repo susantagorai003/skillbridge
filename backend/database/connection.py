@@ -147,16 +147,26 @@ def get_client():
 
     uri = getattr(settings, 'MONGODB_URI', 'mongodb://localhost:27017')
     
-    # Try primary URI (Atlas)
+    # Try primary URI (Atlas) with certifi CA bundle
     try:
-        _client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=10000,
-            connectTimeoutMS=10000,
-            maxPoolSize=50,
-            minPoolSize=1,
-            tlsAllowInvalidCertificates=True,
-        )
+        try:
+            import certifi
+            ca_file = certifi.where()
+        except ImportError:
+            ca_file = None
+
+        conn_options = {
+            'serverSelectionTimeoutMS': 10000,
+            'connectTimeoutMS': 10000,
+            'maxPoolSize': 50,
+            'minPoolSize': 1,
+        }
+        if ca_file:
+            conn_options['tlsCAFile'] = ca_file
+        else:
+            conn_options['tlsAllowInvalidCertificates'] = True
+
+        _client = MongoClient(uri, **conn_options)
         _client.admin.command('ping')
         logger.info("MongoDB Atlas connection established successfully")
         return _client
