@@ -86,14 +86,36 @@ export default function OpportunitiesPage() {
       if (locationFilter) params.location = locationFilter
       if (stipendFilter) params.stipend = stipendFilter
 
-      const [oppsRes, appsRes] = await Promise.all([
-        api.get('/opportunities/internshala/', { params }).catch(() => api.get('/opportunities/', { params })),
+      const [directRes, ishalaRes, appsRes] = await Promise.all([
+        api.get('/opportunities/', { params }).catch(() => ({ data: { items: [] } })),
+        api.get('/opportunities/internshala/', { params }).catch(() => ({ data: { internships: [] } })),
         api.get('/applications/').catch(() => ({ data: { items: [] } })),
       ])
 
-      const items = oppsRes.data?.internships || oppsRes.data?.items || []
-      setOpportunities(items)
-      setHasVerifiedSkills(Boolean(oppsRes.data?.has_student_skills || (oppsRes.data?.student_skills && oppsRes.data.student_skills.length > 0)))
+      const directItems = (directRes.data?.items || []).map((d) => ({
+        ...d,
+        internship_id: d.id,
+        is_direct_employer: true,
+        source: 'skillbridge',
+        match_percentage: 92,
+        stipend: d.stipend || (d.salary_min && d.salary_max
+          ? `₹${(d.salary_min/1000).toFixed(0)}k - ₹${(d.salary_max/1000).toFixed(0)}k/mo`
+          : d.salary_min ? `₹${d.salary_min}` : 'Competitive'),
+        duration: d.duration || '6 months',
+        skills: Array.isArray(d.required_skills)
+          ? d.required_skills.map((s) => typeof s === 'string' ? s : s.name || s.skill_name || 'Technical Skill')
+          : []
+      }))
+
+      const ishalaItems = (ishalaRes.data?.internships || []).map((i) => ({
+        ...i,
+        is_direct_employer: false,
+        source: 'internshala'
+      }))
+
+      const combined = [...directItems, ...ishalaItems]
+      setOpportunities(combined)
+      setHasVerifiedSkills(Boolean(ishalaRes.data?.has_student_skills || (ishalaRes.data?.student_skills && ishalaRes.data.student_skills.length > 0)))
 
       const appliedSet = new Set((appsRes.data?.items || []).map((a) => a.opportunity_id))
       setAppliedOpps(appliedSet)
@@ -500,9 +522,17 @@ export default function OpportunitiesPage() {
                   </div>
 
                   {/* Title & Status */}
-                  <h3 className="font-heading font-bold text-base text-slate-900 mb-2 hover:text-teal transition-colors line-clamp-1">
+                  <h3 className="font-heading font-bold text-base text-slate-900 mb-1.5 hover:text-teal transition-colors line-clamp-1">
                     {opp.title}
                   </h3>
+
+                  {opp.is_direct_employer && (
+                    <div className="mb-2.5">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal/20 text-midnight border border-teal/40 text-[10px] font-extrabold tracking-wide">
+                        <Building2 size={11} className="text-teal" /> Direct Campus Recruiter
+                      </span>
+                    </div>
+                  )}
 
                   {/* Pills row */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-3 text-[11px]">

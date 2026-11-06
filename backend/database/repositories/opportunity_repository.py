@@ -7,10 +7,16 @@ class OpportunityRepository(BaseRepository):
     def __init__(self):
         super().__init__('opportunities')
 
-    def find_active(self, page=1, page_size=20, filters=None):
+    def find_active(self, page=1, page_size=50, filters=None):
+        now = datetime.now(timezone.utc)
         filter_dict = {
-            'status': 'active',
-            'deadline': {'$gte': datetime.now(timezone.utc)}
+            'status': {'$in': ['active', 'open', 'Active', 'Open']},
+            '$or': [
+                {'deadline': {'$gte': now}},
+                {'deadline': {'$gte': now.strftime('%Y-%m-%d')}},
+                {'deadline': {'$exists': False}},
+                {'deadline': None}
+            ]
         }
         if filters:
             if filters.get('type'):

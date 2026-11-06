@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   FileText, Building2, Calendar, Clock, CheckCircle2,
-  AlertCircle, ChevronRight, Briefcase, ExternalLink, Award, Check, X
+  AlertCircle, ChevronRight, Briefcase, ExternalLink, Award, Check, X, Video, Sparkles
 } from 'lucide-react'
 import api from '../../services/api'
 import Card from '../../components/common/Card'
@@ -13,12 +13,20 @@ import Button from '../../components/common/Button'
 
 export default function ApplicationsPage() {
   const [applications, setApplications] = useState([])
+  const [interviews, setInterviews] = useState([])
   const [loading, setLoading] = useState(true)
   const [respondingOffer, setRespondingOffer] = useState(false)
 
   const fetchApplications = () => {
-    api.get('/applications/')
-      .then((res) => setApplications(res.data.items || []))
+    setLoading(true)
+    Promise.all([
+      api.get('/applications/').catch(() => ({ data: { items: [] } })),
+      api.get('/students/interviews/').catch(() => ({ data: { interviews: [] } }))
+    ])
+      .then(([appsRes, intvRes]) => {
+        setApplications(appsRes.data?.items || [])
+        setInterviews(intvRes.data?.interviews || [])
+      })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false))
   }
@@ -75,6 +83,83 @@ export default function ApplicationsPage() {
           Monitor your recruitment journey, upcoming corporate interview rounds, and official placement offers.
         </p>
       </div>
+
+      {/* Dedicated Upcoming Video Interviews Section */}
+      {interviews.length > 0 && (
+        <div className="bg-gradient-to-r from-midnight to-slate-900 rounded-2xl p-5 text-white shadow-lg border border-teal/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-teal animate-ping" />
+              <h2 className="font-heading font-bold text-base text-white flex items-center gap-2">
+                <Video size={18} className="text-teal" />
+                Upcoming Corporate Video Interviews ({interviews.length})
+              </h2>
+            </div>
+            <Link
+              to="/student/gap-analysis"
+              className="text-xs font-bold text-teal hover:underline flex items-center gap-1"
+            >
+              <Sparkles size={13} />
+              Role AI Interview Prep
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {interviews.map((intv) => (
+              <div
+                key={intv.id}
+                className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/15 flex flex-col justify-between gap-3"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div>
+                      <h4 className="font-heading font-bold text-sm text-teal">
+                        {intv.company_name}
+                      </h4>
+                      <p className="text-xs font-semibold text-slate-200">
+                        {intv.role_title}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-teal/20 text-teal text-[10px] font-extrabold uppercase tracking-wider border border-teal/30">
+                      {intv.round_name || 'Interview Round'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-slate-300 mt-2 bg-black/20 px-3 py-2 rounded-lg">
+                    <span className="flex items-center gap-1 text-slate-300">
+                      <Calendar size={13} className="text-teal" /> {intv.interview_date}
+                    </span>
+                    <span className="flex items-center gap-1 text-slate-300">
+                      <Clock size={13} className="text-teal" /> {intv.interview_time || '10:00 AM IST'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <span className="text-[11px] text-slate-400">
+                    Google Meet Live Video Room
+                  </span>
+                  <a
+                    href={intv.meeting_link || 'https://meet.google.com'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      backgroundColor: '#00BFA6',
+                      color: '#14213D',
+                      fontWeight: 700,
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-extrabold hover:opacity-95 transition-all shadow-sm"
+                  >
+                    <Video size={13} />
+                    <span>Join Google Meet</span>
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {applications.length === 0 ? (
         <Card className="text-center py-16 border-slate-200">

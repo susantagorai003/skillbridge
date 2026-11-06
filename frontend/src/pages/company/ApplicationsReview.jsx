@@ -29,6 +29,7 @@ export default function ApplicationsReview() {
   const [statusNote, setStatusNote] = useState('')
   const [targetStage, setTargetStage] = useState('')
   const [interviewDate, setInterviewDate] = useState('2026-11-18')
+  const [meetingLink, setMeetingLink] = useState('https://meet.google.com/skb-tech-intv')
   const [ctcLpa, setCtcLpa] = useState(12.0)
   const [updating, setUpdating] = useState(false)
   const [search, setSearch] = useState('')
@@ -60,6 +61,7 @@ export default function ApplicationsReview() {
         status: targetStage,
         status_notes: statusNote,
         interview_date: targetStage === 'interview_scheduled' ? interviewDate : undefined,
+        interview_link: targetStage === 'interview_scheduled' ? (meetingLink || 'https://meet.google.com/skb-tech-intv') : undefined,
         ctc_lpa: targetStage === 'offer_released' ? ctcLpa : undefined,
       })
 
@@ -249,16 +251,39 @@ export default function ApplicationsReview() {
             </div>
 
             {targetStage === 'interview_scheduled' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Interview Date *
-                </label>
-                <input
-                  type="date"
-                  value={interviewDate}
-                  onChange={(e) => setInterviewDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-teal"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Interview Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={interviewDate}
+                    onChange={(e) => setInterviewDate(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-teal"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Google Meet / Video Interview Link
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => window.open('https://meet.google.com/new', '_blank')}
+                      className="text-[11px] font-bold text-teal hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <ExternalLink size={11} /> Open Google Meet
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={meetingLink}
+                    onChange={(e) => setMeetingLink(e.target.value)}
+                    placeholder="https://meet.google.com/xxx-yyyy-zzz"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-teal font-mono text-slate-800"
+                  />
+                </div>
               </div>
             )}
 

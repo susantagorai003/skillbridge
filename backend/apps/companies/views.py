@@ -283,19 +283,38 @@ class InterviewScheduleView(APIView):
         role_title = request.data.get('role_title', 'Software Engineer')
         interview_date = request.data.get('interview_date')
         interview_time = request.data.get('interview_time', '10:00 AM IST')
-        meeting_link = request.data.get('meeting_link', 'https://meet.google.com/skillbridge-interview')
-        round_name = request.data.get('round_name', 'Technical Assessment Round')
+        company_name = request.data.get('company_name', 'TechCorp Solutions')
+        round_name = request.data.get('round_name', 'Technical Screening & Competency Assessment')
         candidate_name = request.data.get('candidate_name', 'Candidate')
+
+        # Auto-generate a dedicated Google Meet link if not provided
+        meeting_link = request.data.get('meeting_link')
+        if not meeting_link or meeting_link.strip() == '' or 'skillbridge-interview' in meeting_link:
+            code1 = uuid.uuid4().hex[:3]
+            code2 = uuid.uuid4().hex[:4]
+            code3 = uuid.uuid4().hex[:3]
+            meeting_link = f"https://meet.google.com/{code1}-{code2}-{code3}"
 
         if not candidate_id or not interview_date:
             return Response({'success': False, 'errors': {'detail': 'Candidate ID and interview date required'}}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Lookup candidate contact details
+        from bson import ObjectId
+        users_col = get_collection('users')
+        profiles_col = get_collection('student_profiles')
+        oid = ObjectId(candidate_id) if ObjectId.is_valid(candidate_id) else None
+        student_user = users_col.find_one({'$or': [{'_id': oid}, {'id': str(candidate_id)}]}) if oid else users_col.find_one({'id': str(candidate_id)})
+        student_profile = profiles_col.find_one({'$or': [{'user_id': str(candidate_id)}, {'user_id': oid}]}) if oid else {}
+        student_email = (student_user or {}).get('email')
+        student_phone = (student_user or {}).get('phone') or (student_profile or {}).get('phone')
+        candidate_name = (student_user or {}).get('name') or candidate_name
 
         interview_id = f"intv-{uuid.uuid4().hex[:10]}"
         interview_doc = {
             'id': interview_id,
             'candidate_id': str(candidate_id),
             'candidate_name': candidate_name,
-            'company_name': request.data.get('company_name', 'TechCorp'),
+            'company_name': company_name,
             'company_user_id': str(request.user.id) if (request.user and request.user.is_authenticated) else 'recruiter-default',
             'role_title': role_title,
             'round_name': round_name,
@@ -311,31 +330,57 @@ class InterviewScheduleView(APIView):
         col.insert_one(interview_doc)
         interview_doc.pop('_id', None)
 
-        # Update candidate application if exists
+        # Update candidate application if exists, or create an application tracker record
         apps_col = get_collection('applications')
-        apps_col.update_many(
-            {'student_id': str(candidate_id)},
-            {'$set': {'status': 'interview_scheduled', 'interview_date': interview_date, 'interview_link': meeting_link}}
-        )
+        existing_app = apps_col.find_one({
+            'student_id': str(candidate_id),
+            '$or': [{'company_name': company_name}, {'opportunity_title': role_title}]
+        })
+        if existing_app:
+            apps_col.update_one(
+                {'_id': existing_app['_id']},
+                {'$set': {
+                    'status': 'interview_scheduled',
+                    'interview_date': f"{interview_date} at {interview_time}",
+                    'interview_link': meeting_link,
+                    'status_notes': f"Invited for {round_name} on {interview_date} at {interview_time}. Video Meeting Link: {meeting_link}"
+                }}
+            )
+        else:
+            app_doc = {
+                'id': f"app-{uuid.uuid4().hex[:10]}",
+                'student_id': str(candidate_id),
+                'student_name': candidate_name,
+                'student_email': student_email,
+                'opportunity_id': request.data.get('opportunity_id') or f"opp-direct-{uuid.uuid4().hex[:6]}",
+                'opportunity_title': role_title,
+                'company_name': company_name,
+                'company_id': request.data.get('company_id') or 'company-direct',
+                'status': 'interview_scheduled',
+                'interview_date': f"{interview_date} at {interview_time}",
+                'interview_link': meeting_link,
+                'status_notes': f"Invited for {round_name} on {interview_date} at {interview_time}. Video Meeting Link: {meeting_link}",
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            apps_col.insert_one(app_doc)
 
-        # Send notification to the student
-        NotificationService.send_notification(
-            recipient_id=candidate_id,
-            title='Interview Scheduled!',
-            message=f"You have been invited for '{round_name}' for '{role_title}' on {interview_date} at {interview_time}.",
-            notification_type='interview_scheduled',
-            link='/student/applications',
-            metadata={'interview_id': interview_id, 'meeting_link': meeting_link}
-        )
+        # Send multi-channel notification (in-app, WhatsApp, Email)
+        candidate_info = {
+            'id': candidate_id,
+            'name': candidate_name,
+            'email': student_email,
+            'phone': student_phone
+        }
+        MessagingService.notify_interview_scheduled(candidate_info, interview_doc)
 
         AuditService.log_event(
             action='Interview Scheduled',
             actor_id=str(request.user.id) if (request.user and request.user.is_authenticated) else 'company',
             actor_role='company',
-            actor_name=request.data.get('company_name', 'Company'),
+            actor_name=company_name,
             resource_type='interview',
             resource_id=interview_id,
-            details=f"Interview for '{candidate_name}' scheduled on {interview_date} ({round_name})."
+            details=f"Interview for '{candidate_name}' scheduled on {interview_date} ({round_name}). Google Meet: {meeting_link}"
         )
 
         return Response({'success': True, 'interview': interview_doc, 'message': 'Interview scheduled successfully!'}, status=status.HTTP_201_CREATED)

@@ -1,7 +1,7 @@
 import { Outlet, Link } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '../components/layout/Sidebar'
-import { Menu, Bell, Search, Sparkles, Check, ExternalLink, X } from 'lucide-react'
+import { Menu, Bell, Search, Sparkles, Check, ExternalLink, X, Video } from 'lucide-react'
 import useAuth from '../hooks/useAuth'
 import { getInitials } from '../utils/formatters'
 import api from '../services/api'
@@ -155,6 +155,25 @@ export default function DashboardLayout({ role }) {
                             <p className="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed">
                               {n.message}
                             </p>
+                            {n.metadata?.meeting_link && (
+                              <div className="mt-2">
+                                <a
+                                  href={n.metadata.meeting_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    backgroundColor: '#00BFA6',
+                                    color: '#14213D',
+                                    fontWeight: 700,
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-extrabold hover:opacity-90 shadow-xs"
+                                >
+                                  <Video size={12} />
+                                  <span>Join Google Meet</span>
+                                </a>
+                              </div>
+                            )}
                             {n.link && (
                               <Link
                                 to={n.link}

@@ -455,3 +455,112 @@ class MessagingService:
 
         if student_phone:
             cls.send_whatsapp_notification(student_phone, wa_msg, metadata={'training_id': training_doc.get('id')})
+
+    @classmethod
+    def notify_interview_scheduled(cls, candidate_info, interview_doc):
+        """
+        Notify student when an interview is scheduled by a recruiter/company.
+        Dispatches multi-channel notification (In-app, WhatsApp, and Email) with direct video link.
+        """
+        company_name = interview_doc.get('company_name', 'Recruiter')
+        role_title = interview_doc.get('role_title', 'Software Engineer')
+        round_name = interview_doc.get('round_name', 'Technical Screening')
+        interview_date = interview_doc.get('interview_date', 'Upcoming')
+        interview_time = interview_doc.get('interview_time', '10:00 AM IST')
+        meeting_link = interview_doc.get('meeting_link') or 'https://meet.google.com/skb-tech-intv'
+        student_id = candidate_info.get('id') or candidate_info.get('_id')
+        student_email = candidate_info.get('email')
+        student_phone = candidate_info.get('phone')
+        student_name = candidate_info.get('name', 'Candidate')
+        frontend_base = os.getenv('FRONTEND_URL', 'https://skillbridge-gold-one.vercel.app').rstrip('/')
+
+        # 1. In-App Notification with Direct Meeting Link metadata
+        NotificationService.send_notification(
+            recipient_id=str(student_id),
+            title=f"🎯 Interview Invitation: {company_name}",
+            message=f"You are invited for '{round_name}' for '{role_title}' on {interview_date} at {interview_time}. Video Meeting Link: {meeting_link}",
+            notification_type='interview_scheduled',
+            link='/student/applications',
+            metadata={
+                'interview_id': interview_doc.get('id'),
+                'meeting_link': meeting_link,
+                'company_name': company_name,
+                'role_title': role_title,
+                'interview_date': interview_date,
+                'interview_time': interview_time,
+                'round_name': round_name
+            }
+        )
+
+        # 2. WhatsApp Notification
+        if student_phone:
+            wa_text = (
+                f"🎯 *[SkillBridge Interview Invitation]*\n\n"
+                f"🏢 *Company:* {company_name}\n"
+                f"💼 *Role:* {role_title}\n"
+                f"📋 *Round:* {round_name}\n"
+                f"📅 *Date:* {interview_date}\n"
+                f"⏰ *Time:* {interview_time}\n"
+                f"🎥 *Join Google Meet / Video Call:* {meeting_link}\n\n"
+                f"👉 View & prepare on SkillBridge: {frontend_base}/student/applications"
+            )
+            cls.send_whatsapp_notification(student_phone, wa_text, metadata={
+                'company': company_name,
+                'package': f"{role_title} Interview"
+            })
+
+        # 3. Email Notification
+        if student_email:
+            subject = f"🎯 [SkillBridge] Interview Scheduled with {company_name} for {role_title}"
+            plain_email = (
+                f"Dear {student_name},\n\n"
+                f"Congratulations! {company_name} has scheduled an interview with you on SkillBridge:\n\n"
+                f"• Company: {company_name}\n"
+                f"• Job Role: {role_title}\n"
+                f"• Round: {round_name}\n"
+                f"• Date: {interview_date}\n"
+                f"• Time: {interview_time}\n"
+                f"• Video Meeting Link: {meeting_link}\n\n"
+                f"Please join 5 minutes before the scheduled time using the meeting link above.\n\n"
+                f"Best regards,\n"
+                f"Talent Acquisition Team • {company_name}\n"
+                f"SkillBridge Portal: {frontend_base}/student/applications"
+            )
+            html_email = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <div style="background-color: #14213D; padding: 18px; border-radius: 8px; text-align: center; color: white;">
+                    <h2 style="margin: 0; color: #00BFA6;">Official Interview Invitation</h2>
+                    <p style="margin: 4px 0 0; font-size: 13px; color: #cbd5e1;">{company_name} Recruitment Pipeline</p>
+                </div>
+                <div style="padding: 20px 0;">
+                    <p style="font-size: 14px; color: #334155;">Hello <strong>{student_name}</strong>,</p>
+                    <p style="font-size: 14px; color: #334155;">
+                        Your profile and competencies matched our requirements! You have been invited for an interview.
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 13px;">
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 8px 0; font-weight: bold; color: #64748b;">Job Role:</td>
+                            <td style="padding: 8px 0; color: #0f172a; font-weight: 600;">{role_title}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 8px 0; font-weight: bold; color: #64748b;">Round:</td>
+                            <td style="padding: 8px 0; color: #0f172a;">{round_name}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 8px 0; font-weight: bold; color: #64748b;">Date & Time:</td>
+                            <td style="padding: 8px 0; color: #00BFA6; font-weight: 700;">{interview_date} at {interview_time}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: bold; color: #64748b;">Meeting Platform:</td>
+                            <td style="padding: 8px 0; color: #2563eb; font-weight: 600;">Google Meet / Video Room</td>
+                        </tr>
+                    </table>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="{meeting_link}" target="_blank" style="background-color: #00BFA6; color: #14213D; font-weight: bold; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block; font-size: 14px;">
+                            Join Video Interview
+                        </a>
+                    </div>
+                </div>
+            </div>
+            """
+            cls.send_email_notification(student_email, subject, plain_email, html_message=html_email)

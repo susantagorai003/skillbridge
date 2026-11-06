@@ -69,8 +69,34 @@ class OpportunityListView(APIView):
 
         result = repo.find_active(page=page, page_size=page_size, filters=filters)
 
+        # Enrich direct company postings with clean skill names and stipend formatting
+        skills_col = get_collection('skills')
+        all_skills = {str(s.get('_id')): s.get('name') for s in skills_col.find({}, {'_id': 1, 'name': 1})}
+        items = result.get('items', [])
+        for opp in items:
+            opp['is_direct_employer'] = True
+            opp['source'] = 'skillbridge'
+            req_skills = opp.get('required_skills', [])
+            cleaned_skills = []
+            for rs in req_skills:
+                if isinstance(rs, str):
+                    cleaned_skills.append(rs)
+                elif isinstance(rs, dict):
+                    sid = str(rs.get('skill_id') or rs.get('id', ''))
+                    sname = all_skills.get(sid) or rs.get('skill_name') or rs.get('name') or 'Technical Competency'
+                    cleaned_skills.append(sname)
+            opp['required_skills'] = cleaned_skills
+            opp['skills'] = cleaned_skills
+            if not opp.get('stipend'):
+                if opp.get('salary_min') and opp.get('salary_max'):
+                    opp['stipend'] = f"₹{opp['salary_min']} - ₹{opp['salary_max']} /mo" if opp.get('salary_type') == 'monthly' else f"₹{opp['salary_min']//100000} - ₹{opp['salary_max']//100000} LPA"
+                elif opp.get('salary_min'):
+                    opp['stipend'] = f"₹{opp['salary_min']}"
+                else:
+                    opp['stipend'] = 'Competitive'
+
         # If repo is empty, seed with verified tech opportunities so users have live content
-        if not result.get('items') or len(result.get('items', [])) == 0:
+        if not items or len(items) == 0:
             student_skills = _get_student_skills_for_request(request)
             internshala = InternshalaService()
             ishala_res = internshala.search_internships(

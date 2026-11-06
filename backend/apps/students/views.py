@@ -255,7 +255,20 @@ class StudentInterviewsView(APIView):
 
     def get(self, request):
         user_id = str(request.user.id) if (request.user and request.user.is_authenticated) else request.query_params.get('student_id')
-        query = {'candidate_id': user_id} if user_id else {}
+        if user_id:
+            from bson import ObjectId
+            valid_ids = [user_id]
+            if ObjectId.is_valid(user_id):
+                valid_ids.append(ObjectId(user_id))
+            query = {
+                '$or': [
+                    {'candidate_id': {'$in': valid_ids}},
+                    {'student_id': {'$in': valid_ids}}
+                ]
+            }
+        else:
+            query = {}
+
         col = get_collection('interviews')
         interviews = list(col.find(query, {'_id': 0}).sort('interview_date', 1))
         return Response({'success': True, 'interviews': interviews, 'total': len(interviews)})
