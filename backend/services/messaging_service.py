@@ -114,17 +114,30 @@ class MessagingService:
         provider_used = 'skillbridge_sms_gateway'
         error_msg = None
 
+        twilio_content_sid = os.getenv('TWILIO_CONTENT_SID')
+
         if twilio_sid and twilio_token and twilio_wa_number:
             # Direct REST HTTP request to Twilio Messages API
             from_wa = twilio_wa_number.strip().replace('whatsapp:', '')
+            tw_data = {
+                'From': f"whatsapp:{from_wa}",
+                'To': f"whatsapp:{clean_phone}",
+            }
+
+            if twilio_content_sid:
+                tw_data['ContentSid'] = twilio_content_sid
+                vars_dict = (metadata or {}).get('content_variables') or {
+                    "1": str((metadata or {}).get('company', 'Campus Placement')),
+                    "2": str((metadata or {}).get('package', 'SkillBridge Portal'))
+                }
+                tw_data['ContentVariables'] = json.dumps(vars_dict)
+            else:
+                tw_data['Body'] = message
+
             status_code, body = _http_post(
                 f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json",
                 auth=(twilio_sid, twilio_token),
-                data={
-                    'From': f"whatsapp:{from_wa}",
-                    'To': f"whatsapp:{clean_phone}",
-                    'Body': message
-                },
+                data=tw_data,
                 timeout=12
             )
 
