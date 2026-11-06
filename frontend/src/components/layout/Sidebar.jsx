@@ -58,10 +58,12 @@ export default function Sidebar({ role, isOpen, onClose }) {
     <div className="flex flex-col h-full bg-midnight text-white">
       {/* Brand Header */}
       <div className="px-6 h-20 flex items-center justify-between border-b border-slate-800">
-        <NavLink to="/" className="flex items-center gap-2 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal to-mint flex items-center justify-center text-midnight font-heading font-black text-lg shadow-sm">
-            S
-          </div>
+        <NavLink to="/" className="flex items-center gap-2.5 group">
+          <img
+            src="/logo.png"
+            alt="SkillBridge Logo"
+            className="w-9 h-9 rounded-xl object-contain shadow-sm group-hover:scale-105 transition-transform"
+          />
           <span className="font-heading font-extrabold text-xl tracking-tight text-white">
             Skill<span className="text-teal">Bridge</span>
           </span>

@@ -33,9 +33,11 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-18 sm:h-20">
           {/* Brand Logo */}
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal to-mint flex items-center justify-center text-midnight font-heading font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-              S
-            </div>
+            <img
+              src="/logo.png"
+              alt="SkillBridge Logo"
+              className="w-10 h-10 rounded-xl object-contain shadow-md group-hover:scale-105 transition-transform"
+            />
             <span className="font-heading font-extrabold text-2xl tracking-tight text-white">
               Skill<span className="text-teal">Bridge</span>
             </span>

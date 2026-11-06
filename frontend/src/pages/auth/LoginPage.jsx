@@ -43,9 +43,11 @@ export default function LoginPage() {
         {/* Top Brand Logo */}
         <div className="relative z-10">
           <Link to="/" className="inline-flex items-center gap-2.5 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal to-mint flex items-center justify-center text-midnight font-heading font-black text-xl shadow-md">
-              S
-            </div>
+            <img
+              src="/logo.png"
+              alt="SkillBridge Logo"
+              className="w-10 h-10 rounded-xl object-contain shadow-md"
+            />
             <span className="font-heading font-extrabold text-2xl tracking-tight text-white">
               Skill<span className="text-teal">Bridge</span>
             </span>
