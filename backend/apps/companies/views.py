@@ -12,6 +12,7 @@ from apps.companies.serializers import CompanyProfileSerializer
 from services.candidate_service import CandidateService
 from services.notification_service import NotificationService
 from services.audit_service import AuditService
+from services.messaging_service import MessagingService
 
 KNOWN_BRANDS = {
     'razorpay.com': {
