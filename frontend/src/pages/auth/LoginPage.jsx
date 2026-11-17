@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Mail, Lock, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, Sparkles, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import useAuth from '../../hooks/useAuth'
 import { loginSchema } from '../../utils/validators'
+import api from '../../services/api'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 
@@ -12,8 +13,24 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [slowNotice, setSlowNotice] = useState(false)
   const { login, getDashboardPath } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    // Silently pre-warm the Render backend in the background so it spins up before submission
+    api.get('/analytics/platform/').catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let timer
+    if (loading) {
+      timer = setTimeout(() => setSlowNotice(true), 4000)
+    } else {
+      setSlowNotice(false)
+    }
+    return () => clearTimeout(timer)
+  }, [loading])
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(loginSchema),
@@ -26,7 +43,11 @@ export default function LoginPage() {
       await login(data.email, data.password)
       navigate(getDashboardPath())
     } catch (err) {
-      setError(err.response?.data?.errors?.email || err.message || 'Login failed. Please check credentials.')
+      if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+        setError('Cloud server is waking up from standby (Render free tier takes ~50s on cold start). It should be awake now — please click Sign In again.')
+      } else {
+        setError(err.response?.data?.errors?.email || err.response?.data?.message || err.message || 'Login failed. Please check credentials.')
+      }
     } finally {
       setLoading(false)
     }
@@ -158,10 +179,26 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-coral to-coral-dark text-white font-heading font-bold text-sm shadow-md hover:shadow-lg hover:shadow-coral/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-coral to-coral-dark text-white font-heading font-bold text-sm shadow-md hover:shadow-lg hover:shadow-coral/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-80"
             >
-              {loading ? 'Signing in...' : 'Sign In'} <ArrowRight size={16} />
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{slowNotice ? 'Waking up cloud server...' : 'Signing in...'}</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
+
+            {slowNotice && (
+              <p className="text-[11px] text-slate-500 text-center animate-fade-in mt-1">
+                ⏳ The cloud backend (Render free tier) is waking up from standby. This takes ~45–60s on first request.
+              </p>
+            )}
           </form>
 
           <div className="mt-6 pt-6 border-t border-slate-100 text-center">

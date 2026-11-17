@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Building2, BookOpen, ClipboardList, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Building2, BookOpen, ClipboardList, Sparkles, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react'
 import useAuth from '../../hooks/useAuth'
 import { registerSchema } from '../../utils/validators'
+import api from '../../services/api'
 import Input from '../../components/common/Input'
 
 const roles = [
@@ -21,8 +22,24 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [slowNotice, setSlowNotice] = useState(false)
   const { register: registerUser, getDashboardPath } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    // Silently pre-warm the Render backend in the background
+    api.get('/analytics/platform/').catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let timer
+    if (loading) {
+      timer = setTimeout(() => setSlowNotice(true), 4000)
+    } else {
+      setSlowNotice(false)
+    }
+    return () => clearTimeout(timer)
+  }, [loading])
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(registerSchema),
@@ -38,7 +55,11 @@ export default function RegisterPage() {
       await registerUser(data)
       navigate(getDashboardPath())
     } catch (err) {
-      setError(err.response?.data?.errors?.email || err.message || 'Registration failed. Please check your details.')
+      if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+        setError('Cloud server is waking up from standby (Render free tier takes ~50s on cold start). It should be awake now — please click Create Account again.')
+      } else {
+        setError(err.response?.data?.errors?.email || err.response?.data?.message || err.message || 'Registration failed. Please check your details.')
+      }
     } finally {
       setLoading(false)
     }
@@ -219,10 +240,26 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-coral to-coral-dark text-white font-heading font-bold text-sm shadow-md hover:shadow-lg hover:shadow-coral/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-coral to-coral-dark text-white font-heading font-bold text-sm shadow-md hover:shadow-lg hover:shadow-coral/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-80"
             >
-              {loading ? 'Creating Account...' : 'Get Started Now'} <ArrowRight size={16} />
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>{slowNotice ? 'Waking up cloud server...' : 'Creating Account...'}</span>
+                </>
+              ) : (
+                <>
+                  <span>Get Started Now</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
+
+            {slowNotice && (
+              <p className="text-[11px] text-slate-500 text-center animate-fade-in mt-1">
+                ⏳ The cloud backend (Render free tier) is waking up from standby. This takes ~45–60s on first request.
+              </p>
+            )}
           </form>
 
           <div className="mt-6 pt-6 border-t border-slate-100 text-center">

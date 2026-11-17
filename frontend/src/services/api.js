@@ -6,7 +6,7 @@ const apiBase = rawApiUrl ? rawApiUrl.replace(/\/+$/, '') : '/api/v1'
 const api = axios.create({
   baseURL: apiBase,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 35000,
+  timeout: 90000, // 90 seconds to allow Render free-tier cold start to complete
 })
 
 // Request interceptor — attach access token
