@@ -35,6 +35,12 @@ class MarkAllReadView(APIView):
         count = repo.mark_all_read(request.user.id)
         return Response({'success': True, 'modified': count})
 
+    def post(self, request):
+        return self.put(request)
+
+    def patch(self, request):
+        return self.put(request)
+
 
 class UnreadCountView(APIView):
     permission_classes = [IsAuthenticated]

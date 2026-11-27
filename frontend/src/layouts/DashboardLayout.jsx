@@ -5,6 +5,7 @@ import { Menu, Bell, Search, Sparkles, Check, ExternalLink, X, Video } from 'luc
 import useAuth from '../hooks/useAuth'
 import { getInitials } from '../utils/formatters'
 import api from '../services/api'
+import notificationService from '../services/notificationService'
 
 export default function DashboardLayout({ role }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -44,18 +45,24 @@ export default function DashboardLayout({ role }) {
 
   const handleMarkAllRead = async () => {
     try {
-      await api.put('/notifications/mark-all-read/')
       setUnreadCount(0)
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-    } catch (err) {}
+      await notificationService.markAllRead()
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err)
+      fetchNotifications()
+    }
   }
 
   const handleMarkOneRead = async (id) => {
+    if (!id) return
     try {
-      await api.put(`/notifications/${id}/read/`)
-      setNotifications((prev) => prev.map((n) => n.id === id ? ({ ...n, is_read: true }) : n))
+      setNotifications((prev) => prev.map((n) => (n.id === id || n._id === id ? { ...n, is_read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (err) {}
+      await notificationService.markRead(id)
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err)
+    }
   }
 
   return (
@@ -115,15 +122,19 @@ export default function DashboardLayout({ role }) {
                     <div className="flex items-center gap-2">
                       <Bell size={16} className="text-teal" />
                       <h4 className="font-heading font-bold text-sm">Notifications</h4>
-                      {unreadCount > 0 && (
+                      {(unreadCount > 0 || notifications.some((n) => !n.is_read)) && (
                         <span className="px-2 py-0.5 rounded-full bg-teal/20 text-teal text-[11px] font-bold">
-                          {unreadCount} new
+                          {unreadCount || notifications.filter((n) => !n.is_read).length} new
                         </span>
                       )}
                     </div>
-                    {unreadCount > 0 && (
+                    {(unreadCount > 0 || notifications.some((n) => !n.is_read)) && (
                       <button
-                        onClick={handleMarkAllRead}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleMarkAllRead()
+                        }}
                         className="text-[11px] text-teal hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                       >
                         <Check size={12} /> Mark all read
@@ -139,14 +150,16 @@ export default function DashboardLayout({ role }) {
                         <p className="text-[11px] text-slate-400 mt-0.5">You are all caught up with campus and hiring updates!</p>
                       </div>
                     ) : (
-                      notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          onClick={() => handleMarkOneRead(n.id)}
-                          className={`p-3.5 transition-colors cursor-pointer flex items-start gap-3 ${
-                            n.is_read ? 'bg-white hover:bg-slate-50' : 'bg-teal/5 hover:bg-teal/10'
-                          }`}
-                        >
+                      notifications.map((n) => {
+                        const notifId = n.id || n._id
+                        return (
+                          <div
+                            key={notifId || Math.random()}
+                            onClick={() => handleMarkOneRead(notifId)}
+                            className={`p-3.5 transition-colors cursor-pointer flex items-start gap-3 ${
+                              n.is_read ? 'bg-white hover:bg-slate-50' : 'bg-teal/5 hover:bg-teal/10'
+                            }`}
+                          >
                           <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.is_read ? 'bg-slate-300' : 'bg-teal'}`} />
                           <div className="flex-1 min-w-0">
                             <h5 className="font-heading font-bold text-xs text-slate-900 leading-tight">
@@ -185,7 +198,7 @@ export default function DashboardLayout({ role }) {
                             )}
                           </div>
                         </div>
-                      ))
+                      )})
                     )}
                   </div>
                 </div>
